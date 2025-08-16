@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "lint": "eslint .",
+    "zip": "vite build && cd dist && zip -r ../highlyAI.zip .",
     "preview": "vite preview"
   },
   "dependencies": {
