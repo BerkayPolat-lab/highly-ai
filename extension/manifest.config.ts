@@ -21,7 +21,7 @@ export default defineManifest({
       description: 'Open AI Likelihood side panel'
     }
   },
-  host_permissions: ['https://your-api.example.com/*'],
+  host_permissions: ['http://127.0.0.1:8080/*'],
   icons: { '16': 'public/icon16.png', '48': 'public/icon48.png', '128': 'public/icon128.png' },
   // web_accessible_resources: [
   //   { resources: ['src/content/content.js'], matches: ['<all_urls>'] }
