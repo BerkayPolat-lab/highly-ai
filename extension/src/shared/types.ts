@@ -10,14 +10,19 @@ export interface ShowResultPayload {
   message?: string;
 }
 
-export type PanelInboundMessage = { type: 'SHOW_RESULT_LOADING' } | { type: 'SHOW_RESULT_DATA'; payload: ShowResultPayload } | {
+export type PanelInboundMessage = 
+  { type: 'SHOW_RESULT_LOADING' } 
+  | { type: 'SHOW_RESULT_DATA'; payload: ShowResultPayload } | {
       type: 'SHOW_RESULT_ERROR';
       error:
         | 'UNSUPPORTED_PAGE'
         | 'TOO_SHORT'
         | 'PAGE_CHANGED'
         | 'NETWORK_ERROR'
-        | 'NO_CONTENT_ACCESS';
+        | 'NO_CONTENT_ACCESS'
+        | 'NETWORK_OR_TIMEOUT'
+        | 'API_ERROR'
+        | "SELECTION_FAILED";
       payload?: ShowResultPayload;
     };                                  
 

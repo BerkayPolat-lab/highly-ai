@@ -1,6 +1,8 @@
-import type { PanelInboundMessage, PanelReadyMessage, ShowResultPayload } from '../shared/types';
+import type { PanelInboundMessage, PanelReadyMessage } from '../shared/types';
 
 const panelReady = new Map<number, boolean>();
+const API_BASE = 'http://127.0.0.1:8080'
+const API_TIMEOUT_MS = 8000;
 
 chrome.runtime.onMessage.addListener((msg: PanelReadyMessage, sender) => {
   if (msg?.type === 'PANEL_READY' && sender?.tab?.id != null) {
@@ -23,9 +25,7 @@ async function waitForPanelReady(tabId: number, timeoutMs = 1500): Promise<void>
   });
 }
 
-// Small helper to send messages defensively
 async function sendToPanel(tabId: number, m: PanelInboundMessage): Promise<void> {
-  // Ensure the panel is mounted (best-effort)
   await waitForPanelReady(tabId);
 
   try {
@@ -40,38 +40,98 @@ function isSupportedHttpUrl(url?: string | null): boolean {
   return /^https?:/i.test(url);
 }
 
-// Keyboard shortcut handler (user gesture)
 chrome.commands.onCommand.addListener((command) => {
-  if (command !== 'toggle-ai-likelihood-panel') return;
+  if (command !== "toggle-ai-likelihood-panel") return;
+  console.log('onCommand fired:', command);
 
   chrome.tabs.query({ active: true, currentWindow: true }, async ([tab]) => {
     if (!tab?.id) return;
     const tabId = tab.id;
 
     panelReady.delete(tabId);
-
     await chrome.sidePanel.open({ tabId });
-
-    await sendToPanel(tabId, { type: 'SHOW_RESULT_LOADING' });
+    await sendToPanel(tabId, { type: "SHOW_RESULT_LOADING" });
 
     if (!isSupportedHttpUrl(tab.url)) {
       await sendToPanel(tabId, {
-        type: 'SHOW_RESULT_ERROR',
-        error: 'UNSUPPORTED_PAGE',
-        payload: { url: tab.url || '(unknown)' }
+        type: "SHOW_RESULT_ERROR",
+        error: "UNSUPPORTED_PAGE",
+        payload: { url: tab.url || "(unknown)" },
       });
       return;
     }
 
-    setTimeout(async () => {
-      const fake: ShowResultPayload = {
-        prob_ai: 0.63,
-        ci_low: 0.55,
-        ci_high: 0.70,
-        n_tokens: 512,
-        model: 'mock-detector'
-      };
-      await sendToPanel(tabId, { type: 'SHOW_RESULT_DATA', payload: fake });
-    }, 500);
+    let selected = "";
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId, allFrames: true },
+        func: () => window.getSelection()?.toString() ?? "",
+      });
+
+      selected = results.map((r) => (typeof r.result === "string" ? r.result : "")).find((s) => s && s.trim().length > 0) || "";
+    } catch (err) {
+      await sendToPanel(tabId, {
+        type: "SHOW_RESULT_ERROR",
+        error: "SELECTION_FAILED",
+        payload: { message: (err as Error)?.message ?? "Could not read selection" },
+      });
+      return;
+    }
+
+    if (selected.trim().length < 300) {
+      await sendToPanel(tabId, {
+        type: "SHOW_RESULT_ERROR",
+        error: "TOO_SHORT",
+        payload: { nChars: selected.trim().length },
+      });
+      return;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+      const resp = await fetch(`${API_BASE}/score`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: selected }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timer);
+
+      if (!resp.ok) {
+        let detail = `HTTP_${resp.status}`;
+        try {
+          const body = await resp.json();
+          detail = body?.detail || detail;
+        } catch (error) {
+          console.warn("Failed to parse error response from API", error);
+          console.log(`API error: ${detail}`);
+        }
+        await sendToPanel(tabId, {
+          type: "SHOW_RESULT_ERROR",
+          error: "API_ERROR",
+          payload: { message: detail },
+        });
+        return;
+      }
+
+      const data = await resp.json(); 
+      await sendToPanel(tabId, {
+        type: "SHOW_RESULT_DATA",
+        payload: {
+          prob_ai: data.prob_ai,
+          n_tokens: data.n_tokens,
+          model: data.model,
+        },
+      });
+    } catch (err) {
+      await sendToPanel(tabId, {
+        type: "SHOW_RESULT_ERROR",
+        error: "NETWORK_OR_TIMEOUT",
+        payload: { message: (err as Error)?.message ?? "Request failed" },
+      });
+    }
   });
 });

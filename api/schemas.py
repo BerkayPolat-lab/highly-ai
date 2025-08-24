@@ -2,7 +2,10 @@ from pydantic import BaseModel, Field
 
 
 class ScoreIn(BaseModel):
-    text: str = Field(..., min_length=300, description="Text to analyze for AI generation probability")
+    text: str = Field(
+        ..., min_length=300, description="Text to analyze for AI generation probability"
+    )
+
 
 class ScoreOut(BaseModel):
     prob_ai: float = Field(..., description="Probability that the text is AI-generated")

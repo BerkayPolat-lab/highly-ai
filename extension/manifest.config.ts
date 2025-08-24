@@ -17,7 +17,7 @@ export default defineManifest({
   permissions: ['activeTab', 'scripting', 'storage', 'sidePanel'],
   commands: {
     'toggle-ai-likelihood-panel': {
-      suggested_key: { default: 'Ctrl+Shift+1', mac: 'Command+Shift+1' },
+      suggested_key: { default: 'Ctrl+Shift+L', mac: 'Command+Shift+L' },
       description: 'Open AI Likelihood side panel'
     }
   },
