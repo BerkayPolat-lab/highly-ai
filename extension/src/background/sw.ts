@@ -1,14 +1,80 @@
 import type { PanelInboundMessage, PanelReadyMessage } from '../shared/types';
+import { initializeApp, type FirebaseOptions } from "firebase/app";
+import {getAuth, onAuthStateChanged, signOut, type User} from "firebase/auth";
 
 const panelReady = new Map<number, boolean>();
 const API_BASE = 'http://127.0.0.1:8080'
 const API_TIMEOUT_MS = 8000;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL; // AUTH endpoint.
+
+const firebaseConfig: FirebaseOptions = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+}
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+let cachedUser: User | null = null;
+onAuthStateChanged(auth, (u) => {
+  cachedUser = u || null;
+});
+
+
+// AUTH & USAGE LOGGING
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse): boolean | void => {
+  if (msg?.type === "GET_AUTH_STATE") {
+    const state = cachedUser
+      ? {
+          signedIn: true,
+          uid: cachedUser.uid,
+          email: cachedUser.email,
+          displayName: cachedUser.displayName
+        }
+      : { signedIn: false };
+    sendResponse(state);
+    return; 
+  }
+
+  if (msg?.type === "SIGN_OUT") {
+    signOut(auth)
+      .then(() => sendResponse({ ok: true }))
+      .catch((e) => sendResponse({ ok: false, error: String(e) }));
+    return true; 
+  }
+
+  if (msg?.type === "LOG_EVENT") {
+    if (!auth.currentUser) {
+      sendResponse({ ok: false, error: "not_signed_in" });
+      return;
+    }
+    auth.currentUser.getIdToken().then((token: string) => {
+      fetch(`${API_BASE_URL}/api/events/usage`, {method: "POST", 
+        headers: {"Content-Type": "application/json", Authorization: `Bearer ${token}`}, // Includes payload auth token
+        body: JSON.stringify(msg.payload || {})
+      })
+        .then((r) => r.json())
+        .then((data) => sendResponse(data))
+        .catch((e) => sendResponse({ ok: false, error: String(e) }));
+    });
+    return true; 
+  }
+});
+
+
+
+// SIDE PANEL COMMUNICATION & COMMANDS
 
 chrome.runtime.onMessage.addListener((msg: PanelReadyMessage, sender) => {
   if (msg?.type === 'PANEL_READY' && sender?.tab?.id != null) {
     panelReady.set(sender.tab.id, true);
   }
-  // Return false so we don't keep the message channel open
   return false;
 });
 
