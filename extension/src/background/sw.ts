@@ -1,53 +1,42 @@
 import type { PanelInboundMessage, PanelReadyMessage } from '../shared/types';
-import { initializeApp, type FirebaseOptions } from "firebase/app";
-import {getAuth, onAuthStateChanged, signOut, type User} from "firebase/auth";
+import {getAuth, signOut as fbSignOut} from "firebase/auth";
+import {auth} from "../shared/firebase"
 
 const panelReady = new Map<number, boolean>();
 const API_BASE = 'http://127.0.0.1:8080'
 const API_TIMEOUT_MS = 8000;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL; // AUTH endpoint.
 
-const firebaseConfig: FirebaseOptions = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
-}
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-
-let cachedUser: User | null = null;
-onAuthStateChanged(auth, (u) => {
-  cachedUser = u || null;
-});
-
 
 // AUTH & USAGE LOGGING
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse): boolean | void => {
-  if (msg?.type === "GET_AUTH_STATE") {
-    const state = cachedUser
-      ? {
-          signedIn: true,
-          uid: cachedUser.uid,
-          email: cachedUser.email,
-          displayName: cachedUser.displayName
-        }
-      : { signedIn: false };
-    sendResponse(state);
-    return; 
+  // Debug the conditional statement.
+  if (msg?.type === "GET_AUTH") {
+    chrome.storage.local.get("auth").then(({ auth }) => sendResponse(auth))
+    return true;
   }
 
-  if (msg?.type === "SIGN_OUT") {
-    signOut(auth)
-      .then(() => sendResponse({ ok: true }))
-      .catch((e) => sendResponse({ ok: false, error: String(e) }));
-    return true; 
+  if (msg?.type === "SIGNED_OUT") {
+    (async () => {
+      try { 
+      await fbSignOut(getAuth())
+    } catch (err) {
+      console.error(err);
+      console.error("Sign out failed.", err)
+      throw new Error("Sign out failed.");
+    }
+    await chrome.storage.local.set({auth: {signedIn: false}})
+    chrome.runtime.sendMessage({type: "AUTH_UPDATED", payload: {signedIn: false}})
+    sendResponse({ok: true});
+    })();
+    return true;
   }
+
+  if (msg?.type === "AUTH_UPDATED") {
+    chrome.storage.local.set({auth: msg.payload}).then(() => sendResponse({ok: true}))
+  }
+
 
   if (msg?.type === "LOG_EVENT") {
     if (!auth.currentUser) {
@@ -66,6 +55,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse): boolean | voi
     return true; 
   }
 });
+
 
 
 
@@ -108,7 +98,8 @@ function isSupportedHttpUrl(url?: string | null): boolean {
 
 chrome.commands.onCommand.addListener((command) => {
   if (command !== "toggle-ai-likelihood-panel") return;
-  console.log('onCommand fired:', command);
+  console.log('onCommand fired:', command, "sidePanel?", !!chrome.sidePanel);
+
 
   chrome.tabs.query({ active: true, currentWindow: true }, async ([tab]) => {
     if (!tab?.id) return;

@@ -3,3 +3,4 @@ myenv
 .coverage
 .ruff_cache/
 extension/.env
+.git.backup

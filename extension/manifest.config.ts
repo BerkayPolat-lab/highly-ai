@@ -14,7 +14,7 @@ export default defineManifest({
       run_at: 'document_idle',
     },
   ],
-  permissions: ["storage", "identity", "activeTab", "scripting", "tabs"],
+  permissions: ["storage", "identity", "activeTab", "scripting", "tabs", "sidePanel"],
   commands: {
     'toggle-ai-likelihood-panel': {
       suggested_key: { default: 'Ctrl+Shift+L', mac: 'Command+Shift+L' },

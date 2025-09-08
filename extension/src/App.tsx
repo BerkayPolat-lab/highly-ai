@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+// import {signOut as fbSignOut, getAuth} from "firebase/auth"
 
 type AuthState = {
   signedIn: boolean;
   uid?: string;
-  email?: string | null;
-  displayName?: string | null;
+  email?: string;
+  displayName?: string;
+  token?: string;
+  ts?: number;
 }
 
 function App() {
@@ -19,7 +22,16 @@ function App() {
     }).catch(() => {
       setLoading(false);
     });
+
+    const handler = (msg: any) => {
+      if (msg?.type === "AUTH_UPDATED") {
+        setAuth(msg.payload);
+      }
+    }
+    chrome.runtime.onMessage.addListener(handler);
+    return () => chrome.runtime.onMessage.removeListener(handler);
   }, [])
+
 
   const openAuthTab = (mode: "signin" | "signup") => {
     const url = chrome.runtime.getURL(`auth.html#mode=${mode}`);
@@ -27,9 +39,8 @@ function App() {
   }
 
   const signOut = () => {
-    chrome.runtime.sendMessage({ type: "SIGN_OUT" }, () => {
-      setAuth({ signedIn: false });
-    });
+    // tell background to clear storage (and your auth tab can also do Firebase signOut)
+    chrome.runtime.sendMessage({ type: "SIGNED_OUT" }, () => setAuth({ signedIn: false }));
   };
 
   if (loading) return <div className="p-3 text-sm">Loading…</div>;
@@ -65,7 +76,8 @@ function App() {
         <div className="text-gray-600">{auth.email}</div>
       </div>
       <button
-        onClick={signOut}
+        onClick={signOut} // Calling the signOut function when the sign-out button is pressed. 
+        // Come back if an error occurs. Signing 
         className="mt-3 rounded-xl px-3 py-2 border text-sm hover:bg-gray-50 w-full"
       >
         Sign out

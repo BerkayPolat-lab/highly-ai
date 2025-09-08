@@ -1,18 +1,25 @@
 import React, { useMemo, useState } from "react";
-import { initializeApp } from "firebase/app";
-import {getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile,} from "firebase/auth";
+import {createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile} from "firebase/auth";
 import "../index.css"
+import {auth} from "../shared/firebase"
+// import { email } from "zod";
 
+async function afterAuthSucces() {
+  const u = auth.currentUser!;
+  const token = await u.getIdToken();
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-};
+  const authState = {
+  signedIn: true,
+  uid: u.uid,
+  displayName: u.displayName, // Make the name, email and password fields a requirement for the user. 
+  email: u.email,
+  token,
+  ts: Date.now(),
+  }
 
-const app = initializeApp(firebaseConfig, "auth-page");
-const auth = getAuth(app);
+  await chrome.storage.local.set({ auth: authState }).then(() => {console.log("Auth state set.")})
+  chrome.runtime.sendMessage({ type: "AUTH_UPDATED", payload: authState })
+}
 
 function useMode(): "signin" | "signup" {
   return useMemo(() => (location.hash.toLowerCase().includes("signup") ? "signup" : "signin"), []);
@@ -33,11 +40,14 @@ export default function AuthForm() {
     setError(null);
     try {
       if (mode === "signup") {
+        if (!name.trim()) throw new Error("Name is required."); // Name field is required.
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         if (name.trim()) await updateProfile(cred.user, { displayName: name.trim() });
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
+
+      await afterAuthSucces(); // Sign in/up Successful. Send the user information to the pop-up window for display.
 
       const token = await auth.currentUser?.getIdToken();
       if (token) {
@@ -116,11 +126,13 @@ export default function AuthForm() {
       <button type="submit" disabled={busy} className="w-full rounded-xl border border-black bg-black text-black px-3 py-2 disabled:opacity-70">
         {busy ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
       </button>
-      <div className="w-full mt-3 text-sm">
+
+     { /* Work on the redirecting page. */ }
+      {/* <div className="w-full mt-3 text-sm">
         {mode === "signup" ? (<a href="#mode=signin" className="underline">Already have an account? Sign in</a>
         ) : (<a href="#mode=signup" className="underline">New here? Create an account</a> // Work on the redirecting later.
         )}
-      </div>
+      </div> */}
     </form>
   );
 }
