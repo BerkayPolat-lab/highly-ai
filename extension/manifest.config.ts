@@ -14,19 +14,28 @@ export default defineManifest({
       run_at: 'document_idle',
     },
   ],
-  permissions: ["storage", "identity", "activeTab", "scripting", "tabs", "sidePanel"],
+  permissions: ["storage", "identity", "activeTab", "scripting", "tabs", "sidePanel" , "offscreen"],
   commands: {
     'toggle-ai-likelihood-panel': {
       suggested_key: { default: 'Ctrl+Shift+L', mac: 'Command+Shift+L' },
       description: 'Open AI Likelihood side panel'
     }
   },
-  host_permissions: ['<all_urls>'],
+  host_permissions: [
+    '<all_urls>', 
+    "https://apis.google.com/*",
+    "https://www.googleapis.com/*",
+    "https://www.gstatic.com/*",
+    "https://securetoken.googleapis.com/*"
+  ],
   icons: { '16': 'public/icon16.png', '48': 'public/icon48.png', '128': 'public/icon128.png' },
   web_accessible_resources: [
     {
       resources: ["auth.html"],
       matches: ['<all_urls>']
     }
-  ]
+  ], 
+  content_security_policy: {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src https://apis.google.com https://www.googleapis.com https://www.gstatic.com https://securetoken.googleapis.com"
+  }
 });

@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import  GoogleButton from "./ui/popup/GoogleButton.tsx"
+
+// import {signInWithPopUp, GoogleAuthProvider, getAuth} from "firebase/auth"
+// import {app, auth} from "./shared/firebase"
+
 // import {signOut as fbSignOut, getAuth} from "firebase/auth"
 
 type AuthState = {
@@ -39,7 +44,6 @@ function App() {
   }
 
   const signOut = () => {
-    // tell background to clear storage (and your auth tab can also do Firebase signOut)
     chrome.runtime.sendMessage({ type: "SIGNED_OUT" }, () => setAuth({ signedIn: false }));
   };
 
@@ -63,6 +67,10 @@ function App() {
             className="rounded-xl px-3 py-2 border text-sm hover:bg-gray-50">
             Create account
           </button>
+        </div>
+        {/* Change the Tailwind properties, if necessary. */}
+        <div className="grid gap-3 mt-3">
+          <GoogleButton />
         </div>
       </div>
     );
