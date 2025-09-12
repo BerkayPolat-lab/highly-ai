@@ -28,7 +28,7 @@ const GoogleAuth: React.FC = () => {
         chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             if (message?.type !== "offscreen") return;
 
-            if (message?.type === "firebase-auth/start") {
+            if (ready === true && message?.type === "firebase-auth/start") { // Perform the conditional only when ready === true, meaning that the iframe is mounted.
                 if (!iframeRef.current?.contentWindow) {
                     sendResponse({ok: false, error: "Iframe not ready."})
                     return true;
@@ -44,14 +44,13 @@ const GoogleAuth: React.FC = () => {
         })
     }, [])
 
-    const onLoad = () => setReady(true);
 
   return (
     <div style={{ width: 1, height: 1, overflow: "hidden" }}>
       <iframe
         ref={iframeRef}
         src={HOSTED_AUTH_URL}
-        onLoad={onLoad}
+        onLoad={() => setReady(true)}
         style={{ width: 1, height: 1, border: "0" }}
         title="firebase-auth"
       />

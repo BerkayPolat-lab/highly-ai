@@ -46,11 +46,14 @@ async function closeOffscreen() {
 async function signInWithGoogleFlow() {
   await ensureOffscreen();
 
-  const started = await chrome.runtime.sendMessage({
-    target: "offscreen",
-    type: "firebase-auth/start",
-  });
-  if (!started?.ok) throw new Error(started?.error ?? "Failed to start offscreen auth.");
+  let started = await chrome.runtime.sendMessage({target: "offscreen", type: "firebase-auth/start"});
+
+  if (!started.ok) {
+    await new Promise(res => setTimeout(res, 500));
+    started = await chrome.runtime.sendMessage({target: "offscreen", type: "firebase-auth/start"}); 
+  }
+
+  if (!started?.ok) throw new Error(started?.error ?? "Failed to start offscreen auth"); // An Error occurs when the Google Authentication button is pressed.
 
   const result = await new Promise<{ ok: boolean; idToken?: string; profile?: any; error?: any }>(
     (resolve) => {

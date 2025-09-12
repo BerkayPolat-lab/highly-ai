@@ -22,11 +22,14 @@ export default defineManifest({
     }
   },
   host_permissions: [
-    '<all_urls>', 
     "https://apis.google.com/*",
     "https://www.googleapis.com/*",
     "https://www.gstatic.com/*",
-    "https://securetoken.googleapis.com/*"
+    "https://securetoken.googleapis.com/*",
+    "http://localhost:5173/*",
+    "http://127.0.0.1:5173/*",
+    "http://localhost:3001/*",
+    "https://localhost:3001/*"
   ],
   icons: { '16': 'public/icon16.png', '48': 'public/icon48.png', '128': 'public/icon128.png' },
   web_accessible_resources: [
@@ -36,6 +39,13 @@ export default defineManifest({
     }
   ], 
   content_security_policy: {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src https://apis.google.com https://www.googleapis.com https://www.gstatic.com https://securetoken.googleapis.com"
+    'extension_pages': "script-src 'self'; object-src 'self'; " +
+        "connect-src 'self' https://accounts.google.com https://apis.google.com " +
+        "https://www.googleapis.com https://www.gstatic.com https://securetoken.googleapis.com " +
+        "http://localhost:5173 ws://localhost:5173 http://127.0.0.1:5173 " +
+        "http://localhost:3001 https://localhost:3001; " +
+        "frame-src http://localhost:3001 https://localhost:3001;"
+      
+      
   }
 });
