@@ -4,6 +4,7 @@ import {getAuth, signOut as fbSignOut} from "firebase/auth";
 import {auth} from "../shared/firebase"
 
 const panelReady = new Map<number, boolean>();
+
 const API_BASE = 'http://127.0.0.1:8080'
 const API_TIMEOUT_MS = 8000;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL; // AUTH endpoint.
@@ -180,33 +181,39 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse): boolean | voi
 
 // SIDE PANEL COMMUNICATION & COMMANDS
 
-chrome.runtime.onMessage.addListener((msg: PanelReadyMessage, sender) => {
-  if (msg?.type === 'PANEL_READY' && sender?.tab?.id != null) {
-    panelReady.set(sender.tab.id, true);
+// chrome.runtime.onMessage.addListener((msg: PanelReadyMessage, sender) => {
+//   if (msg?.type === 'PANEL_READY' && sender?.tab?.id != null) {
+//     panelReady.set(sender.tab.id, true);
+//   }
+//   return false;
+// });
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === 'PANEL_READY') {
+    const tabId = typeof msg.tabId === 'number' ? msg.tabId : sender.tab?.id;
+    if (typeof tabId === 'number') panelReady.set(tabId, true);
+    sendResponse(true);              // ack so the panel sets connected=true
+    return;                          // sync response; no need to `return true`
   }
-  return false;
 });
 
-async function waitForPanelReady(tabId: number, timeoutMs = 1500): Promise<void> {
+async function waitForPanelReady(tabId: number, timeoutMs = 3000): Promise<void> {
   if (panelReady.get(tabId)) return;
   const start = Date.now();
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
     const iv = setInterval(() => {
-      if (panelReady.get(tabId) || Date.now() - start > timeoutMs) {
-        clearInterval(iv);
-        resolve();
-      }
+      if (panelReady.get(tabId)) { clearInterval(iv); resolve(); }
+      else if (Date.now() - start > timeoutMs) { clearInterval(iv); reject(new Error('PANEL_NOT_READY')); }
     }, 50);
   });
 }
 
 async function sendToPanel(tabId: number, m: PanelInboundMessage): Promise<void> {
-  await waitForPanelReady(tabId);
-
   try {
-    await chrome.runtime.sendMessage(m);
-  } catch (e) {
-    console.debug('sendToPanel failed:', (e as Error).message || e);
+    await waitForPanelReady(tabId);
+    await chrome.runtime.sendMessage({ ...m, tabId });
+  } catch {
+    await chrome.runtime.sendMessage({ type: 'SHOW_RESULT_ERROR', error: 'PANEL_NOT_READY' , tabId });
   }
 }
 
@@ -214,6 +221,8 @@ function isSupportedHttpUrl(url?: string | null): boolean {
   if (!url) return false;
   return /^https?:/i.test(url);
 }
+
+
 
 chrome.commands.onCommand.addListener((command) => {
   if (command !== "toggle-ai-likelihood-panel") return;

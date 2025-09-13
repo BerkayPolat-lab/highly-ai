@@ -6,26 +6,25 @@ export default function SidePanel() {
   const [msg, setMsg] = React.useState<PanelInboundMessage | null>(null);
   const [connected, setConnected] = React.useState(false);
 
-  React.useEffect(() => {
-    const ready: PanelReadyMessage = { type: 'PANEL_READY' };
-    chrome.runtime.sendMessage(ready).then(
-      () => setConnected(true),
-      () => setConnected(false),
-    );
+React.useEffect(() => {
+  (async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabId = tab?.id ?? -1;
 
-    const handler = (incoming: PanelInboundMessage) => {
-      if (
-        incoming?.type === 'SHOW_RESULT_LOADING' ||
-        incoming?.type === 'SHOW_RESULT_DATA' ||
-        incoming?.type === 'SHOW_RESULT_ERROR'
-      ) {
-        setMsg(incoming);
-      }
-    };
+    const ok: PanelReadyMessage = await chrome.runtime.sendMessage({ type: 'PANEL_READY', tabId });
+    setConnected(Boolean(ok));
+  })().catch(() => setConnected(false));
 
-    chrome.runtime.onMessage.addListener(handler);
-    return () => chrome.runtime.onMessage.removeListener(handler);
-  }, []);
+  const handler = (incoming: PanelInboundMessage) => {
+    if (incoming?.type === 'SHOW_RESULT_LOADING' ||
+        incoming?.type === 'SHOW_RESULT_DATA'    ||
+        incoming?.type === 'SHOW_RESULT_ERROR') {
+      setMsg(incoming);
+    }
+  };
+  chrome.runtime.onMessage.addListener(handler);
+  return () => chrome.runtime.onMessage.removeListener(handler);
+}, []);
 
   if (!connected) return <div style={{ padding: 16 }}>Connecting to extension…</div>;
   if (!msg || msg.type === 'SHOW_RESULT_LOADING') {

@@ -27,6 +27,7 @@ export default defineManifest({
     "https://www.gstatic.com/*",
     "https://securetoken.googleapis.com/*",
     "http://localhost:5173/*",
+    "http://127.0.0.1:8080/*",
     "http://127.0.0.1:5173/*",
     "http://localhost:3001/*",
     "https://localhost:3001/*"
@@ -40,11 +41,11 @@ export default defineManifest({
   ], 
   content_security_policy: {
     'extension_pages': "script-src 'self'; object-src 'self'; " +
-        "connect-src 'self' https://accounts.google.com https://apis.google.com " +
-        "https://www.googleapis.com https://www.gstatic.com https://securetoken.googleapis.com " +
-        "http://localhost:5173 ws://localhost:5173 http://127.0.0.1:5173 " +
-        "http://localhost:3001 https://localhost:3001; " +
-        "frame-src http://localhost:3001 https://localhost:3001;"
+    "connect-src 'self' https://accounts.google.com https://apis.google.com " +
+    "https://www.googleapis.com https://www.gstatic.com https://securetoken.googleapis.com " +
+    "http://localhost:5173 ws://localhost:5173 http://127.0.0.1:5173 " +
+    "http://localhost:3001 https://localhost:3001 http://127.0.0.1:8080; " +
+    "frame-src http://localhost:3001 https://localhost:3001;"
       
       
   }
