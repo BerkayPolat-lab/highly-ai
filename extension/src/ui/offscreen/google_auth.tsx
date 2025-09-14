@@ -10,40 +10,46 @@ const GoogleAuth: React.FC = () => {
 
     useEffect(() => {
         const onMessage = (ev: MessageEvent) => {
-            if (ev.origin !== TARGET_ORIGIN) return
+        if (ev.origin !== TARGET_ORIGIN) return;
             try {
-                const data = typeof ev.data === "string" ? JSON.parse(ev.data) : ev.data
-                chrome.runtime.sendMessage({target: "sw", type: "firebase-auth/result", payload: data}) // sending the data to the service worker. 
+                const data = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data;
+                chrome.runtime.sendMessage({
+                    target: 'sw',
+                    type: 'firebase-auth/result',
+                    payload: data,
+                });
             } catch (err) {
-                console.error("error: ", err)
-            }
-        }
+            console.error('error: ', err);
+            chrome.runtime.sendMessage({
+                target: 'sw',
+                type: 'firebase-auth/result',
+                payload: { ok: false, error: { message: String(err) } },
+            });
+        }};
+        window.addEventListener('message', onMessage);
+        return () => window.removeEventListener('message', onMessage);
+  }, []);
 
-        window.addEventListener("message", onMessage)
-        return () => window.removeEventListener("message", onMessage)
-    }, [])
+useEffect(() => {
+  const messageHandler = (message: any, _sender: any, sendResponse: any) => {
+    if (message?.target !== 'offscreen') return false;     // correct gate
 
+    if (message?.type === 'firebase-auth/start') {
+      if (!ready || !iframeRef.current?.contentWindow) {
+        sendResponse({ ok: false, error: 'Iframe not ready.' });
+        return true; // synchronous response is fine; true is harmless
+      }
+      iframeRef.current.contentWindow.postMessage('initAuth', TARGET_ORIGIN);
+      sendResponse({ ok: true });
+      return true;
+    }
 
-    useEffect(() => {
-        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-            if (message?.type !== "offscreen") return;
+    return false;
+  };
 
-            if (ready === true && message?.type === "firebase-auth/start") { // Perform the conditional only when ready === true, meaning that the iframe is mounted.
-                if (!iframeRef.current?.contentWindow) {
-                    sendResponse({ok: false, error: "Iframe not ready."})
-                    return true;
-                }
-
-                iframeRef.current.contentWindow.postMessage("initAuth", TARGET_ORIGIN)
-                sendResponse({ok: true})
-                return true;
-            }
-
-            
-        return false;
-        })
-    }, [])
-
+  chrome.runtime.onMessage.addListener(messageHandler);
+  return () => chrome.runtime.onMessage.removeListener(messageHandler);
+}, [ready]);
 
   return (
     <div style={{ width: 1, height: 1, overflow: "hidden" }}>

@@ -13,7 +13,14 @@ export default defineConfig({
       input: {
         popup: path.resolve(__dirname, 'index.html'),
         auth:  path.resolve(__dirname, 'auth.html'),
+        offscreen: path.resolve(__dirname, 'offscreen/index.html')
       },
-  }
+    }
+  },
+    server: {
+    hmr: {
+      overlay: true, 
+      clientPort: 5173
+    },
   },
 })

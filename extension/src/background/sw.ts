@@ -1,4 +1,4 @@
-import type { PanelInboundMessage, PanelReadyMessage } from '../shared/types';
+import type { PanelInboundMessage } from '../shared/types';
 import { GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCredential } from 'firebase/auth/web-extension';
 import {getAuth, signOut as fbSignOut} from "firebase/auth";
 import {auth} from "../shared/firebase"
@@ -58,20 +58,23 @@ async function signInWithGoogleFlow() {
 
   const result = await new Promise<{ ok: boolean; idToken?: string; profile?: any; error?: any }>(
     (resolve) => {
-      const listener = (msg: any, _sender: chrome.runtime.MessageSender) => {
+      const listener = (msg: any) => {
         if (msg?.target === "sw" && msg?.type === "firebase-auth/result") {
           chrome.runtime.onMessage.removeListener(listener);
-          resolve(msg.payload);
+          resolve(msg.payload ?? { ok: false, error: { message: 'No payload' } });
         }
       };
       chrome.runtime.onMessage.addListener(listener);
+
+      setTimeout(() => {
+        chrome.runtime.onMessage.removeListener(listener);
+        resolve({ ok: false, error: { message: "Timed out waiting for auth result" } });
+      }, 10000);
     }
   );
 
-  await closeOffscreen();
-
-  if (!result.ok || !result.idToken) {
-    throw new Error(result?.error?.message || "Google sign-in failed");
+  if (!result || !result.ok || !result.idToken) {
+    throw new Error(result?.error?.message ?? 'Google sign-in failed');
   }
 
   // Firebase session established.
@@ -86,6 +89,8 @@ async function signInWithGoogleFlow() {
       photoURL: userCred.user.photoURL,
     },
   });
+
+  await closeOffscreen();
 
   return userCred.user;
 }
