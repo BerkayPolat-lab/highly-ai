@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-import  GoogleButton from "./ui/popup/GoogleButton.tsx"
+// import  GoogleButton from "./ui/popup/GoogleButton.tsx"
 
 // import {signInWithPopUp, GoogleAuthProvider, getAuth} from "firebase/auth"
 // import {app, auth} from "./shared/firebase"
@@ -69,9 +69,9 @@ function App() {
           </button>
         </div>
         {/* Change the Tailwind properties, if necessary. */}
-        <div className="grid gap-3 mt-3">
+        {/* <div className="grid gap-3 mt-3">
           <GoogleButton />
-        </div>
+        </div> */}
       </div>
     );
   }

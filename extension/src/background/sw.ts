@@ -1,5 +1,5 @@
 import type { PanelInboundMessage } from '../shared/types';
-import { GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCredential } from 'firebase/auth/web-extension';
+// import { GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCredential } from 'firebase/auth/web-extension';
 import {getAuth, signOut as fbSignOut} from "firebase/auth";
 import {auth} from "../shared/firebase"
 
@@ -8,128 +8,119 @@ const panelReady = new Map<number, boolean>();
 const API_BASE = 'http://127.0.0.1:8080'
 const API_TIMEOUT_MS = 8000;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL; // AUTH endpoint.
-const OFFSCREEN_PATH = "offscreen/index.html" // change the path, if an error occurs.
-let creatingOffscreen: Promise<void> | undefined;
+// const OFFSCREEN_PATH = "offscreen/index.html" // change the path, if an error occurs.
+// let creatingOffscreen: Promise<void> | undefined;
 
 //
 // Google Auth - Offscreen Document 
 //
 
-async function offscreenExists(): Promise<boolean> {
-  return await chrome.offscreen.hasDocument();
-}
+// async function offscreenExists(): Promise<boolean> {
+//   return await chrome.offscreen.hasDocument();
+// }
 
-async function ensureOffscreen() {
-  if (await offscreenExists()) return;
-  if (creatingOffscreen) {
-    await creatingOffscreen;
-    return;
-  }
+// async function ensureOffscreen() {
+//   if (await offscreenExists()) return;
+//   if (creatingOffscreen) {
+//     await creatingOffscreen;
+//     return;
+//   }
 
-  creatingOffscreen = chrome.offscreen.createDocument({
-    url: OFFSCREEN_PATH,
-    reasons: [chrome.offscreen.Reason.DOM_SCRAPING],
-    justification: "Run Firebase signInWithPopup via hosted page inside iframe",
-  }) as unknown as Promise<void>;
-  try {
-    await creatingOffscreen;
-  } finally {
-    creatingOffscreen = undefined;
-  }
-}
+//   creatingOffscreen = chrome.offscreen.createDocument({
+//     url: OFFSCREEN_PATH,
+//     reasons: [chrome.offscreen.Reason.DOM_SCRAPING],
+//     justification: "Run Firebase signInWithPopup via hosted page inside iframe",
+//   }) as unknown as Promise<void>;
+//   try {
+//     await creatingOffscreen;
+//   } finally {
+//     creatingOffscreen = undefined;
+//   }
+// }
 
-async function closeOffscreen() {
-  if (await offscreenExists()) {
-    await chrome.offscreen.closeDocument();
-  }
-}
+// async function closeOffscreen() {
+//   if (await offscreenExists()) {
+//     await chrome.offscreen.closeDocument();
+//   }
+// }
 
-async function signInWithGoogleFlow() {
-  await ensureOffscreen();
+// async function signInWithGoogleFlow() {
+//   await ensureOffscreen();
+//   let started = await chrome.runtime.sendMessage({target: "offscreen", type: "firebase-auth/start"});
+//   if (!started.ok) {
+//     await new Promise(res => setTimeout(res, 500));
+//     started = await chrome.runtime.sendMessage({target: "offscreen", type: "firebase-auth/start"}); 
+//   }
+//   if (!started?.ok) throw new Error(started?.error ?? "Failed to start offscreen auth"); // An Error occurs when the Google Authentication button is pressed.
 
-  let started = await chrome.runtime.sendMessage({target: "offscreen", type: "firebase-auth/start"});
+//   const result = await new Promise<{ ok: boolean; idToken?: string; profile?: any; error?: any }>(
+//     (resolve) => {
+//       const listener = (msg: any) => {
+//         if (msg?.target === "sw" && msg?.type === "firebase-auth/result") {
+//           chrome.runtime.onMessage.removeListener(listener);
+//           resolve(msg.payload ?? { ok: false, error: { message: 'No payload' } });
+//         }
+//       };
+//       chrome.runtime.onMessage.addListener(listener);
+//       setTimeout(() => {
+//         chrome.runtime.onMessage.removeListener(listener);
+//         resolve({ ok: false, error: { message: "Timed out waiting for auth result" } });
+//       }, 10000);
+//     }
+//   );
 
-  if (!started.ok) {
-    await new Promise(res => setTimeout(res, 500));
-    started = await chrome.runtime.sendMessage({target: "offscreen", type: "firebase-auth/start"}); 
-  }
+//   if (!result || !result.ok || !result.idToken) {
+//     throw new Error(result?.error?.message ?? 'Google sign-in failed');
+//   }
 
-  if (!started?.ok) throw new Error(started?.error ?? "Failed to start offscreen auth"); // An Error occurs when the Google Authentication button is pressed.
+//   // Firebase session established.
+//   const cred = GoogleAuthProvider.credential(result.idToken);
+//   const userCred = await signInWithCredential(auth, cred);
 
-  const result = await new Promise<{ ok: boolean; idToken?: string; profile?: any; error?: any }>(
-    (resolve) => {
-      const listener = (msg: any) => {
-        if (msg?.target === "sw" && msg?.type === "firebase-auth/result") {
-          chrome.runtime.onMessage.removeListener(listener);
-          resolve(msg.payload ?? { ok: false, error: { message: 'No payload' } });
-        }
-      };
-      chrome.runtime.onMessage.addListener(listener);
+//   await chrome.storage.local.set({
+//     uid: userCred.user.uid,
+//     userProfile: result.profile || {email: userCred.user.email, displayName: userCred.user.displayName, photoURL: userCred.user.photoURL,},
+//   });
 
-      setTimeout(() => {
-        chrome.runtime.onMessage.removeListener(listener);
-        resolve({ ok: false, error: { message: "Timed out waiting for auth result" } });
-      }, 10000);
-    }
-  );
+//   await closeOffscreen();
+//   return userCred.user;
+// }
 
-  if (!result || !result.ok || !result.idToken) {
-    throw new Error(result?.error?.message ?? 'Google sign-in failed');
-  }
+// // Public message API for popup/content scripts
+// chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+//   (async () => {
+//     if (msg?.type === "auth/signInWithGoogle") {
+//       try {
+//         const user = await signInWithGoogleFlow();
+//         sendResponse({ ok: true, uid: user.uid });
+//       } catch (e: any) {
+//         sendResponse({ ok: false, error: e.message ?? String(e) });
+//       }
+//       return;
+//     }
 
-  // Firebase session established.
-  const cred = GoogleAuthProvider.credential(result.idToken);
-  const userCred = await signInWithCredential(auth, cred);
+//     if (msg?.type === "auth/signOut") {
+//       await signOut(auth);
+//       await chrome.storage.local.remove(["uid", "userProfile"]);
+//       sendResponse({ ok: true });
+//       return;
+//     }
 
-  await chrome.storage.local.set({
-    uid: userCred.user.uid,
-    userProfile: result.profile || {
-      email: userCred.user.email,
-      displayName: userCred.user.displayName,
-      photoURL: userCred.user.photoURL,
-    },
-  });
+//     if (msg?.type === "auth/getIdToken") {
+//       const token = auth.currentUser ? await auth.currentUser.getIdToken(false) : null;
+//       sendResponse({ ok: true, idToken: token });
+//       return;
+//     }
+//   })();
 
-  await closeOffscreen();
+//   return true; // keep the message channel open for async sendResponse
+// });
 
-  return userCred.user;
-}
-
-// Public message API for popup/content scripts
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  (async () => {
-    if (msg?.type === "auth/signInWithGoogle") {
-      try {
-        const user = await signInWithGoogleFlow();
-        sendResponse({ ok: true, uid: user.uid });
-      } catch (e: any) {
-        sendResponse({ ok: false, error: e.message ?? String(e) });
-      }
-      return;
-    }
-
-    if (msg?.type === "auth/signOut") {
-      await signOut(auth);
-      await chrome.storage.local.remove(["uid", "userProfile"]);
-      sendResponse({ ok: true });
-      return;
-    }
-
-    if (msg?.type === "auth/getIdToken") {
-      const token = auth.currentUser ? await auth.currentUser.getIdToken(false) : null;
-      sendResponse({ ok: true, idToken: token });
-      return;
-    }
-  })();
-
-  return true; // keep the message channel open for async sendResponse
-});
-
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    await chrome.storage.local.remove(["uid", "userProfile"]);
-  }
-});
+// onAuthStateChanged(auth, async (user) => {
+//   if (!user) {
+//     await chrome.storage.local.remove(["uid", "userProfile"]);
+//   }
+// });
 
 //
 // AUTH & USAGE LOGGING
